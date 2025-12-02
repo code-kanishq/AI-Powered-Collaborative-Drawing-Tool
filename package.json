@@ -1,0 +1,28 @@
+{
+  "name": "draw-app",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "kill-ports": "node scripts/kill-ports.js",
+    "predev": "pnpm kill-ports && pnpm --filter @repo/db run build",
+    "dev": "turbo run dev --filter=web --filter=http-backend --filter=ws-backend",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "prisma": "5.19.1",
+    "turbo": "^2.6.1",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@prisma/client": "5.19.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  }
+}

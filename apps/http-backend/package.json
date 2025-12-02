@@ -1,0 +1,35 @@
+{
+  "name": "http-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "dev": "tsc -b && node dist/index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@repo/backend-common": "workspace:*",
+    "@repo/common": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@sanity/client": "^7.13.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "google-auth-library": "^10.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0",
+    "openai": "^6.9.1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/node-fetch": "^2.6.13"
+  }
+}

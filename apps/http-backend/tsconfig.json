@@ -1,0 +1,11 @@
+{
+  "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    // Fix Express typing issues ↓↓↓
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": false
+  }
+}
