@@ -1,6 +1,6 @@
 const { execSync } = require('child_process');
 
-const ports = [3000, 8081];
+const ports = [3000, 3001, 8081];
 
 console.log('Checking for processes on ports:', ports.join(', '));
 

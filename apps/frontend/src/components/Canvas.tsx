@@ -5,6 +5,7 @@ import { IconButton } from "./IconButton";
 import { Circle, Pencil, Square } from "lucide-react";
 import { Game } from "@/make/Game";
 import type { Tool } from "@/make/tool-types";
+import { HTTP_BACKEND } from "@/config";
 
 export function Canvas({
   roomId,
@@ -21,16 +22,14 @@ export function Canvas({
   // AI chat state
   const [prompt, setPrompt] = useState("");
   const [log, setLog] = useState<string[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
 
-  // --------------------------
   // Initialize the Game object
-  // --------------------------
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const game = new Game(canvasRef.current, roomId, socket);
     gameRef.current = game;
-
     game.setTool(selectedTool);
 
     return () => {
@@ -47,77 +46,83 @@ export function Canvas({
   }, [selectedTool]);
 
   // ----------------------------------------------------------
-  // Simple AI COMMAND PARSER  (no actual LLM call yet)
+  // AI COMMAND — calls Gemini via backend
   // ----------------------------------------------------------
-  function processAICommand(text: string) {
-    const g = gameRef.current;
-    if (!g) return;
-
-    const lower = text.toLowerCase();
-
-    // draw circle radius 40 at 200 200
-    const circleMatch = lower.match(/circle.*?radius\s+(\d+).*?at\s+(\d+)\s+(\d+)/);
-    if (circleMatch) {
-      const radius = parseInt(circleMatch[1]);
-      const x = parseInt(circleMatch[2]);
-      const y = parseInt(circleMatch[3]);
-      g.drawCircle(x, y, radius);
-      return "✔️ Circle created";
-    }
-
-    // rectangle 120 80 at 300 100
-    const rectMatch = lower.match(/rect|rectangle.*?(\d+)\s+(\d+).*?at\s+(\d+)\s+(\d+)/);
-    if (rectMatch) {
-      const w = parseInt(rectMatch[1]);
-      const h = parseInt(rectMatch[2]);
-      const x = parseInt(rectMatch[3]);
-      const y = parseInt(rectMatch[4]);
-      g.drawRect(x, y, w, h);
-      return "✔️ Rectangle created";
-    }
-
-    // line 0 0 to 400 100
-    const lineMatch = lower.match(/line.*?(\d+)\s+(\d+).*?to\s+(\d+)\s+(\d+)/);
-    if (lineMatch) {
-      const x1 = parseInt(lineMatch[1]);
-      const y1 = parseInt(lineMatch[2]);
-      const x2 = parseInt(lineMatch[3]);
-      const y2 = parseInt(lineMatch[4]);
-      g.drawLine(x1, y1, x2, y2);
-      return "✔️ Line created";
-    }
-
-    return "❌ Sorry, I didn't understand that command.";
-  }
-
-  function handleSend() {
+  async function handleSend() {
     if (!prompt.trim()) return;
 
     const userText = prompt.trim();
-    setLog((prev) => [...prev, "👤: " + userText]);
-
-    const response = processAICommand(userText);
-    setLog((prev) => [...prev, "🤖: " + response]);
-
+    setLog((prev) => [...prev, "👤 " + userText]);
     setPrompt("");
+    setAiLoading(true);
+
+    try {
+      const response = await fetch(`${HTTP_BACKEND}/ai/parse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userText }),
+      });
+
+      const data = await response.json();
+
+      if (data.output) {
+        try {
+          const parsed = JSON.parse(data.output);
+          const g = gameRef.current;
+
+          if (g && parsed.shapes && Array.isArray(parsed.shapes)) {
+            parsed.shapes.forEach((shape: any) => {
+              if (shape.type === "circle") {
+                g.drawCircle(shape.centerX, shape.centerY, shape.radius);
+              } else if (shape.type === "rect") {
+                g.drawRect(shape.x, shape.y, shape.width, shape.height);
+              } else if (shape.type === "pencil") {
+                g.drawLine(shape.startX, shape.startY, shape.endX, shape.endY);
+              }
+            });
+            setLog((prev) => [
+              ...prev,
+              `🤖 Drew ${parsed.shapes.length} shape(s)!`,
+            ]);
+          } else {
+            setLog((prev) => [...prev, "🤖 No shapes returned."]);
+          }
+        } catch (err) {
+          setLog((prev) => [
+            ...prev,
+            "🤖 Could not parse AI response. Try rephrasing.",
+          ]);
+        }
+      } else {
+        setLog((prev) => [...prev, "🤖 AI error: " + JSON.stringify(data)]);
+      }
+    } catch (err) {
+      setLog((prev) => [
+        ...prev,
+        "🤖 Network error — is the backend running?",
+      ]);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  // Allow pressing Enter to send
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   }
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        overflow: "hidden",
-        display: "flex",
-      }}
-    >
+    <div style={{ height: "100vh", overflow: "hidden", display: "flex" }}>
+
       {/* MAIN CANVAS */}
       <canvas
         ref={canvasRef}
         height={typeof window !== "undefined" ? window.innerHeight : 800}
         width={typeof window !== "undefined" ? window.innerWidth - 350 : 1000}
-        style={{
-          borderRight: "1px solid #ddd",
-        }}
+        style={{ borderRight: "1px solid #ddd" }}
       />
 
       {/* AI CHAT SIDEBAR */}
@@ -132,8 +137,12 @@ export function Canvas({
           padding: 12,
         }}
       >
-        <h2 style={{ fontWeight: "bold", marginBottom: 10 }}>AI Assistant</h2>
+        <h2 style={{ fontWeight: "bold", marginBottom: 4 }}>🤖 AI Assistant</h2>
+        <p style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
+          Describe what to draw — e.g. "draw a house using rectangles"
+        </p>
 
+        {/* Message log */}
         <div
           style={{
             flex: 1,
@@ -143,10 +152,16 @@ export function Canvas({
             padding: 10,
             border: "1px solid #ddd",
             marginBottom: 10,
+            fontSize: 13,
           }}
         >
+          {log.length === 0 && (
+            <p style={{ color: "#aaa", textAlign: "center", marginTop: 20 }}>
+              Your conversation will appear here
+            </p>
+          )}
           {log.map((msg, i) => (
-            <div key={i} style={{ marginBottom: 6 }}>
+            <div key={i} style={{ marginBottom: 8, lineHeight: 1.4 }}>
               {msg}
             </div>
           ))}
@@ -155,7 +170,8 @@ export function Canvas({
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Type a command…"
+          onKeyDown={handleKeyDown}
+          placeholder="Type a command and press Enter…"
           style={{
             width: "100%",
             height: 80,
@@ -163,20 +179,24 @@ export function Canvas({
             borderRadius: 8,
             border: "1px solid #ccc",
             resize: "none",
+            fontSize: 13,
           }}
         />
 
         <button
           onClick={handleSend}
+          disabled={aiLoading}
           style={{
             marginTop: 8,
             padding: "10px 16px",
-            background: "black",
+            background: aiLoading ? "#888" : "black",
             color: "white",
             borderRadius: 8,
+            cursor: aiLoading ? "not-allowed" : "pointer",
+            fontSize: 14,
           }}
         >
-          Send
+          {aiLoading ? "Thinking…" : "Send"}
         </button>
       </div>
 
@@ -193,14 +213,7 @@ type TopBarProps = {
 
 function TopBar({ selectedTool, setSelectedTool }: TopBarProps) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 10,
-        left: 10,
-        zIndex: 100,
-      }}
-    >
+    <div style={{ position: "fixed", top: 10, left: 10, zIndex: 100 }}>
       <div className="flex gap-2">
         <IconButton
           onClick={() => setSelectedTool("pencil")}

@@ -5,7 +5,7 @@
     "build": "turbo run build",
     "kill-ports": "node scripts/kill-ports.js",
     "predev": "pnpm kill-ports && pnpm --filter @repo/db run build",
-    "dev": "turbo run dev --filter=web --filter=http-backend --filter=ws-backend",
+    "dev": "turbo run dev --filter=frontend --filter=http-backend --filter=ws-backend",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
